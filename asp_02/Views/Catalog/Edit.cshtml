@@ -55,6 +55,12 @@
                 <a asp-action="Index" class="btn btn-light">Скасувати</a>
                 <button type="submit" class="btn btn-primary px-4">Оновити дані</button>
             </div>
+            @section Scripts {
+                @{
+                    await Html.RenderPartialAsync("_ValidationScriptsPartial");
+                }
+            }
+
         </form>
     </div>
 </div>

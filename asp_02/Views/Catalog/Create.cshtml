@@ -56,6 +56,12 @@
                 <a asp-action="Index" class="btn btn-light">Назад до каталогу</a>
                 <button type="submit" class="btn btn-success px-4">Зберегти товар</button>
             </div>
+            @section Scripts {
+                @{
+                    await Html.RenderPartialAsync("_ValidationScriptsPartial");
+                }
+            }
+
         </form>
     </div>
 </div>
