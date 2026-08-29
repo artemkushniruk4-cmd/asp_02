@@ -10,25 +10,22 @@ namespace asp_02.Controllers
     {
         private readonly IProductRepository _productRepository;
         private readonly AppDbContext _context;
+        private readonly IWebHostEnvironment _webHostEnvironment;
 
-        // Впроваджуємо репозиторій для товарів та контекст для швидкого завантаження категорій
-        public CatalogController(IProductRepository productRepository, AppDbContext context)
+        public CatalogController(IProductRepository productRepository, AppDbContext context, IWebHostEnvironment webHostEnvironment)
         {
             _productRepository = productRepository;
             _context = context;
+            _webHostEnvironment = webHostEnvironment;
         }
 
-        // 1. ГОЛОВНА СТОРІНКА КАТАЛОГУ (З підтримкою фільтрації за категоріями)
-        // GET: /Catalog або /Catalog?category=Електроніка
         public async Task<IActionResult> Index(string? category)
         {
             IEnumerable<Product> products;
-
-            // Фільтруємо товари, якщо категорію передано в URL і це не варіант "Всі"
             if (!string.IsNullOrEmpty(category) && category != "Всі")
             {
                 products = await _productRepository.GetProductsByCategoryNameAsync(category);
-                ViewBag.SelectedCategory = category; // Запам'ятовуємо активну категорію для підсвічування кнопки
+                ViewBag.SelectedCategory = category;
             }
             else
             {
@@ -36,38 +33,48 @@ namespace asp_02.Controllers
                 ViewBag.SelectedCategory = "Всі";
             }
 
-            // Отримуємо з бази даних список лише НАЗВ усіх категорій для створення кнопок-фільтрів
             ViewBag.CategoriesList = await _context.Categories.Select(c => c.Name).ToListAsync();
-
             return View(products);
         }
 
-        // 2. СТВОРЕННЯ ТОВАРУ (Відображення форми GET)
         public async Task<IActionResult> Create()
         {
-            // Формуємо випадаючий список категорій з існуючих у БД
             ViewBag.Categories = new SelectList(await _context.Categories.ToListAsync(), "Id", "Name");
             return View();
         }
 
-        // 3. СТВОРЕННЯ ТОВАРУ (Збереження в БД POST)
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(Product product)
+        public async Task<IActionResult> Create(Product product, IFormFile imageFile)
         {
-            // Перевіряємо валідацію моделі (атрибути [Required], [Range] тощо)
+            ModelState.Remove("Image");
+
             if (ModelState.IsValid)
             {
+                if (imageFile != null && imageFile.Length > 0)
+                {
+                    string uploadsFolder = Path.Combine(_webHostEnvironment.WebRootPath, "images");
+                    if (!Directory.Exists(uploadsFolder)) Directory.CreateDirectory(uploadsFolder);
+
+                    string uniqueFileName = Guid.NewGuid().ToString() + "_" + Path.GetFileName(imageFile.FileName);
+                    string filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                    using (var fileStream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await imageFile.CopyToAsync(fileStream);
+                    }
+
+                    product.Image = "/images/" + uniqueFileName;
+                }
+
                 await _productRepository.CreateProductAsync(product);
                 return RedirectToAction(nameof(Index));
             }
 
-            // Якщо дані некоректні, перестворюємо список категорій та повертаємо користувача на форму з помилками
             ViewBag.Categories = new SelectList(await _context.Categories.ToListAsync(), "Id", "Name", product.CategoryId);
             return View(product);
         }
 
-        // 4. РЕДАГУВАННЯ ТОВАРУ (Відображення форми GET)
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null) return NotFound();
@@ -75,20 +82,44 @@ namespace asp_02.Controllers
             var product = await _productRepository.GetProductByIdAsync(id.Value);
             if (product == null) return NotFound();
 
-            // Передаємо список категорій із попередньо обраною категорією цього товару
             ViewBag.Categories = new SelectList(await _context.Categories.ToListAsync(), "Id", "Name", product.CategoryId);
             return View(product);
         }
 
-        // 5. РЕДАГУВАННЯ ТОВАРУ (Оновлення даних у БД POST)
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, Product product)
+        public async Task<IActionResult> Edit(int id, Product product, IFormFile? imageFile)
         {
             if (id != product.Id) return NotFound();
+            ModelState.Remove("Image");
 
             if (ModelState.IsValid)
             {
+                if (imageFile != null && imageFile.Length > 0)
+                {
+                    if (!string.IsNullOrEmpty(product.Image) && !product.Image.StartsWith("http"))
+                    {
+                        string oldFilePath = Path.Combine(_webHostEnvironment.WebRootPath, product.Image.TrimStart('/'));
+                        if (System.IO.File.Exists(oldFilePath))
+                        {
+                            System.IO.File.Delete(oldFilePath);
+                        }
+                    }
+
+                    string uploadsFolder = Path.Combine(_webHostEnvironment.WebRootPath, "images");
+                    if (!Directory.Exists(uploadsFolder)) Directory.CreateDirectory(uploadsFolder);
+
+                    string uniqueFileName = Guid.NewGuid().ToString() + "_" + Path.GetFileName(imageFile.FileName);
+                    string filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                    using (var fileStream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await imageFile.CopyToAsync(fileStream);
+                    }
+
+                    product.Image = "/images/" + uniqueFileName;
+                }
+
                 await _productRepository.UpdateProductAsync(product);
                 return RedirectToAction(nameof(Index));
             }
@@ -97,12 +128,23 @@ namespace asp_02.Controllers
             return View(product);
         }
 
-        // 6. ВИДАЛЕННЯ ТОВАРУ (POST-запит безпечного видалення)
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            await _productRepository.DeleteProductAsync(id);
+            var product = await _productRepository.GetProductByIdAsync(id);
+            if (product != null)
+            {
+                if (!string.IsNullOrEmpty(product.Image) && !product.Image.StartsWith("http"))
+                {
+                    string filePath = Path.Combine(_webHostEnvironment.WebRootPath, product.Image.TrimStart('/'));
+                    if (System.IO.File.Exists(filePath))
+                    {
+                        System.IO.File.Delete(filePath);
+                    }
+                }
+                await _productRepository.DeleteProductAsync(id);
+            }
             return RedirectToAction(nameof(Index));
         }
     }
