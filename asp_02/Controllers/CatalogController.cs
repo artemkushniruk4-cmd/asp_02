@@ -8,56 +8,57 @@ namespace asp_02.Controllers
 {
     public class CatalogController : Controller
     {
-        private readonly AppDbContext _context;
+        private readonly IProductRepository _productRepository;
+        private readonly AppDbContext _context; // залишаємо виключно для швидкого виклику списку категорій у ViewBag
 
-        public CatalogController(AppDbContext context)
+        // Впроваджуємо РЕПОЗИТОРІЙ замість чистого DbContext для товарів
+        public CatalogController(IProductRepository productRepository, AppDbContext context)
         {
+            _productRepository = productRepository;
             _context = context;
         }
 
-        // 1. Спиоск товарів (Каталог)
+        // 1. Отримати всі товари (Каталог)
         public async Task<IActionResult> Index()
         {
-            // Завантажуємо разом із категоріями для відображення назви категорії
-            var products = await _context.Products.Include(p => p.Category).ToListAsync();
+            var products = await _productRepository.GetAllProductsAsync();
             return View(products);
         }
 
-        // 2. Створення товару (Форма GET)
+        // 2. Створення товару (GET)
         public async Task<IActionResult> Create()
         {
             ViewBag.Categories = new SelectList(await _context.Categories.ToListAsync(), "Id", "Name");
             return View();
         }
 
-        // 3. Створення товару (Збереження POST)
+        // 3. Створення товару (POST)
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(Product product)
         {
             if (ModelState.IsValid)
             {
-                _context.Add(product);
-                await _context.SaveChangesAsync();
+                await _productRepository.CreateProductAsync(product);
                 return RedirectToAction(nameof(Index));
             }
             ViewBag.Categories = new SelectList(await _context.Categories.ToListAsync(), "Id", "Name", product.CategoryId);
             return View(product);
         }
 
-        // 4. Редагування товару (Форма GET)
+        // 4. Редагування товару (GET)
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null) return NotFound();
 
-            var product = await _context.Products.FindAsync(id);
+            var product = await _productRepository.GetProductByIdAsync(id.Value);
             if (product == null) return NotFound();
 
             ViewBag.Categories = new SelectList(await _context.Categories.ToListAsync(), "Id", "Name", product.CategoryId);
             return View(product);
         }
 
-        // 5. Редагування товару (Збереження POST)
+        // 5. Редагування товару (POST)
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, Product product)
@@ -66,16 +67,7 @@ namespace asp_02.Controllers
 
             if (ModelState.IsValid)
             {
-                try
-                {
-                    _context.Update(product);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!_context.Products.Any(e => e.Id == product.Id)) return NotFound();
-                    else throw;
-                }
+                await _productRepository.UpdateProductAsync(product);
                 return RedirectToAction(nameof(Index));
             }
             ViewBag.Categories = new SelectList(await _context.Categories.ToListAsync(), "Id", "Name", product.CategoryId);
@@ -87,12 +79,7 @@ namespace asp_02.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var product = await _context.Products.FindAsync(id);
-            if (product != null)
-            {
-                _context.Products.Remove(product);
-                await _context.SaveChangesAsync();
-            }
+            await _productRepository.DeleteProductAsync(id);
             return RedirectToAction(nameof(Index));
         }
     }
