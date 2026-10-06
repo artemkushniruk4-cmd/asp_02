@@ -1,0 +1,61 @@
+@model IEnumerable<asp_02.Models.CartItemViewModel>
+
+@{
+    ViewData["Title"] = "Кошик";
+    var items = Model.ToList();
+}
+
+<div class="container my-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="font-weight-bold mb-0">Кошик</h1>
+        <a asp-controller="Catalog" asp-action="Index" class="btn btn-outline-primary">← До каталогу</a>
+    </div>
+
+    @if (!items.Any())
+    {
+        <div class="alert alert-info">
+            Кошик порожній.
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            @foreach (var item in items)
+            {
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100 shadow-sm border-0">
+                        <img src="@item.Product.Image" class="card-img-top" alt="@item.Product.Name" style="height: 200px; object-fit: cover;">
+
+                        <div class="card-body">
+                            <h5 class="card-title">@item.Product.Name</h5>
+                            <p class="text-muted small">@item.Product.Description</p>
+                            <p class="text-success fw-bold mb-2">@item.Product.Price.ToString("F2") грн</p>
+                            <p class="small text-muted">Максимум: @item.Product.Amount шт.</p>
+
+                            <div class="d-flex align-items-center justify-content-center gap-3 mt-3">
+                                <form asp-action="Decrease" asp-route-id="@item.Product.Id" method="post">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-outline-danger btn-lg">−</button>
+                                </form>
+
+                                <span class="fs-4 fw-bold">@item.Quantity</span>
+
+                                @if (item.Quantity < item.Product.Amount)
+                                {
+                                    <form asp-action="Increase" asp-route-id="@item.Product.Id" method="post">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-outline-success btn-lg">+</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-outline-secondary btn-lg" disabled>+</button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
