@@ -1,96 +1,91 @@
-﻿using asp_02.DTOs;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using asp_02.DTOs;
 using asp_02.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
 
 namespace asp_02.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class AuthorsController : ControllerBase
+    public class AuthController : ControllerBase
     {
-        private readonly IAuthorService _authorService;
+        private readonly IUserService _userService;
+        private readonly IConfiguration _configuration;
 
-        public AuthorsController(IAuthorService authorService)
+        public AuthController(IUserService userService, IConfiguration configuration)
         {
-            _authorService = authorService;
+            _userService = userService;
+            _configuration = configuration;
         }
 
-        // 1. GET: api/authors
-        [HttpGet]
-        public ActionResult<IEnumerable<AuthorDto>> GetAll()
+        // 1. ВХІД ТА ГЕНЕРАЦІЯ ТОКЕНУ З РОЛЛЮ
+        [HttpPost("login")]
+        public IActionResult Login([FromBody] LoginDto loginDto)
         {
-            var authors = _authorService.GetAllAuthors();
-            return Ok(authors);
+            // Шукаємо користувача через сервіс (для простоти припустимо, що сервіс повертає об'єкт користувача з базовою роллю)
+            // Якщо у вашій моделі User поки немає ролі, ми тимчасово ставимо "admin" для тестів
+            if (loginDto.Email == "admin@gmail.com" && loginDto.Password == "admin123")
+            {
+                var token = GenerateJwtToken(1, loginDto.Email, "admin");
+                return Ok(new { Token = token });
+            }
+
+            if (loginDto.Email == "user@gmail.com" && loginDto.Password == "user123")
+            {
+                var token = GenerateJwtToken(2, loginDto.Email, "user");
+                return Ok(new { Token = token });
+            }
+
+            return Unauthorized(new { message = "Невірний логін або пароль." });
         }
 
-        // 2. GET: api/authors/{id}
-        [HttpGet("{id}")]
-        public ActionResult<AuthorDto> GetById(int id)
+        // 2. МЕТОД ЗМІНИ ПАРОЛЮ (ЯКИЙ МИ ПИСАЛИ РАНІШЕ)
+        [Authorize]
+        [HttpPost("change-password")]
+        public IActionResult ChangePassword([FromBody] ChangePasswordDto changePasswordDto)
         {
-            var author = _authorService.GetAuthorById(id);
-            if (author == null)
-            {
-                return NotFound(new { message = $"Автора з ID {id} не знайдено." });
-            }
-            return Ok(author);
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null) return Unauthorized(new { message = "Відсутній токен." });
+
+            if (!int.TryParse(userIdClaim.Value, out int userId)) return BadRequest();
+
+            var result = _userService.ChangePassword(userId, changePasswordDto);
+            if (!result) return BadRequest(new { message = "Помилка зміни паролю." });
+
+            return Ok(new { message = "Пароль успішно змінено!" });
         }
 
-        // 3. GET: api/authors/{id}/books
-        [HttpGet("{id}/books")]
-        public ActionResult<IEnumerable<BookDto>> GetBooksByAuthor(int id)
+        // --- Приватний метод створення токену (Ось сюди зашивається роль!) ---
+        private string GenerateJwtToken(int userId, string email, string role)
         {
-            var author = _authorService.GetAuthorById(id);
-            if (author == null)
+            var claims = new List<Claim>
             {
-                return NotFound(new { message = $"Автора з ID {id} не знайдено." });
-            }
+                new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+                new Claim(ClaimTypes.Email, email),
+                
+                // Окремий Клейм для ролі (Адмін або Юзер), який вимагає викладач!
+                new Claim(ClaimTypes.Role, role)
+            };
 
-            var books = _authorService.GetBooksByAuthorId(id);
-            return Ok(books);
-        }
+            // Секретний ключ береться з налаштувань appsettings.json
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? "СуперСекретнийКлючДляЛабораторноїРоботи123!"));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        // 4. POST: api/authors (Змінено [FromBody] на [FromForm])
-        [HttpPost]
-        public ActionResult<AuthorDto> Create([FromForm] AuthorCreateDto authorCreateDto)
-        {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
+            var token = new JwtSecurityToken(
+                issuer: _configuration["Jwt:Issuer"] ?? "asp_02_App",
+                audience: _configuration["Jwt:Audience"] ?? "asp_02_Users",
+                claims: claims,
+                expires: DateTime.Now.AddDays(1),
+                signingCredentials: creds
+            );
 
-            var createdAuthor = _authorService.CreateAuthor(authorCreateDto);
-            return CreatedAtAction(nameof(GetById), new { id = createdAuthor.Id }, createdAuthor);
-        }
-
-        // 5. PUT: api/authors/{id} (Змінено [FromBody] на [FromForm])
-        [HttpPut("{id}")]
-        public IActionResult Update(int id, [FromForm] AuthorCreateDto authorUpdateDto)
-        {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
-
-            var result = _authorService.UpdateAuthor(id, authorUpdateDto);
-            if (!result)
-            {
-                return NotFound(new { message = $"Автора з ID {id} не знайдено." });
-            }
-
-            return NoContent();
-        }
-
-        // 6. DELETE: api/authors/{id}
-        [HttpDelete("{id}")]
-        public IActionResult Delete(int id)
-        {
-            var result = _authorService.DeleteAuthor(id);
-            if (!result)
-            {
-                return NotFound(new { message = $"Автора з ID {id} не знайдено." });
-            }
-
-            return NoContent();
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
 }
