@@ -47,5 +47,10 @@ namespace asp_02.Data
         {
             _context.SaveChanges();
         }
+        public IEnumerable<Product> GetBooksByAuthorId(int authorId)
+        {
+            return _context.Products.Where(p => p.AuthorId == authorId).ToList();
+        }
+
     }
 }
