@@ -41,6 +41,8 @@ namespace asp_02.Models
         public Category? Category { get; set; }
         public int? AuthorId { get; set; }
         public Author? Author { get; set; }
+        // Зв'язок багатьох до багатьох (у однієї книги може бути кілька жанрів)
+        public ICollection<Genre> Genres { get; set; } = new List<Genre>();
 
     }
 }
