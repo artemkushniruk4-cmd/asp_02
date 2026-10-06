@@ -1,10 +1,21 @@
 using asp_02.Data;
 using asp_02.Services;
 using asp_02.DTOs;
+using asp_02.Middlewares; // Підключаємо папку з нашим Middleware
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
+using Serilog; // Підключаємо Serilog
 
 var builder = WebApplication.CreateBuilder(args);
+
+// --- НАЛАШТУВАННЯ SERILOG ДЛЯ ЛОГУВАННЯ У ФАЙЛ ---
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console() // Дублювати логи в консоль Visual Studio
+    .WriteTo.File("Logs/log.txt", rollingInterval: RollingInterval.Day) // Запис у файл, новий файл щодня
+    .CreateLogger();
+
+// Кажемо додатку використовувати саме Serilog замість стандартного логера
+builder.Host.UseSerilog();
 
 // Реєстрація репозиторіїв та сервісів в DI
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
@@ -27,6 +38,10 @@ builder.Services.AddDbContext<asp_02.Data.AppDbContext>(options =>
 
 var app = builder.Build();
 
+// --- ПІДКЛЮЧЕННЯ НАШОГО КАСТОМНОГО MIDDLEWARE ---
+// Важливо: ставимо його на самий початок конвеєра, щоб засікати абсолютно весь час
+app.UseMiddleware<RequestLoggingMiddleware>();
+
 // Виклик сідера для автоматичного заповнення ролей admin/user в БД
 DbSeeder.SeedRoles(app);
 
@@ -34,7 +49,6 @@ DbSeeder.SeedRoles(app);
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms.
     app.UseHsts();
 }
 
@@ -51,4 +65,16 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
-app.Run();
+try
+{
+    Log.Information("Додаток успішно запускається...");
+    app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Додаток завершив роботу некоректно!");
+}
+finally
+{
+    Log.CloseAndFlush();
+}
