@@ -1,11 +1,13 @@
 ﻿using asp_02.DTOs;
 using asp_02.Services;
+using Microsoft.AspNetCore.Authorization; // Підключаємо систему авторизації .NET
 using Microsoft.AspNetCore.Mvc;
 
 namespace asp_02.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Roles = "admin")] // Обмежуємо доступ до всього контролера тільки для адмінів
     public class RoleController : ControllerBase
     {
         private readonly IRoleService _roleService;
