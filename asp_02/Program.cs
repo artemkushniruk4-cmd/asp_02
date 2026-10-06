@@ -1,10 +1,13 @@
 using asp_02.Data;
+using asp_02.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 // Реєстрація репозиторію в DI
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<IAuthorRepository, AuthorRepository>();
+builder.Services.AddScoped<IAuthorService, AuthorService>();
+
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
