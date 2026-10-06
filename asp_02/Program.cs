@@ -1,13 +1,18 @@
 using asp_02.Data;
 using asp_02.Services;
+using asp_02.DTOs; // Підключаємо DTOs для доступу до AuthorCreateDtoValidator
+using FluentValidation; // Підключаємо FluentValidation
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
-// Реєстрація репозиторію в DI
+
+// Реєстрація репозиторіїв та сервісів в DI
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<IAuthorRepository, AuthorRepository>();
 builder.Services.AddScoped<IAuthorService, AuthorService>();
 
+// Реєстрація FluentValidation (сканує збірку та додає AuthorCreateDtoValidator)
+builder.Services.AddValidatorsFromAssemblyContaining<AuthorCreateDtoValidator>();
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
