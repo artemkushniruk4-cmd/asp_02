@@ -15,7 +15,7 @@ namespace asp_02.Controllers
             _authorService = authorService;
         }
 
-        // 1. GET: api/authors (GetAll)
+        // 1. GET: api/authors
         [HttpGet]
         public ActionResult<IEnumerable<AuthorDto>> GetAll()
         {
@@ -23,7 +23,7 @@ namespace asp_02.Controllers
             return Ok(authors);
         }
 
-        // 2. GET: api/authors/{id} (GetById)
+        // 2. GET: api/authors/{id}
         [HttpGet("{id}")]
         public ActionResult<AuthorDto> GetById(int id)
         {
@@ -35,7 +35,7 @@ namespace asp_02.Controllers
             return Ok(author);
         }
 
-        // 3. GET: api/authors/{id}/books (GetBooksByAuthor)
+        // 3. GET: api/authors/{id}/books
         [HttpGet("{id}/books")]
         public ActionResult<IEnumerable<BookDto>> GetBooksByAuthor(int id)
         {
@@ -49,9 +49,9 @@ namespace asp_02.Controllers
             return Ok(books);
         }
 
-        // 4. POST: api/authors (Create)
+        // 4. POST: api/authors (Змінено [FromBody] на [FromForm])
         [HttpPost]
-        public ActionResult<AuthorDto> Create([FromBody] AuthorCreateDto authorCreateDto)
+        public ActionResult<AuthorDto> Create([FromForm] AuthorCreateDto authorCreateDto)
         {
             if (!ModelState.IsValid)
             {
@@ -62,9 +62,9 @@ namespace asp_02.Controllers
             return CreatedAtAction(nameof(GetById), new { id = createdAuthor.Id }, createdAuthor);
         }
 
-        // 5. PUT: api/authors/{id} (Update)
+        // 5. PUT: api/authors/{id} (Змінено [FromBody] на [FromForm])
         [HttpPut("{id}")]
-        public IActionResult Update(int id, [FromBody] AuthorCreateDto authorUpdateDto)
+        public IActionResult Update(int id, [FromForm] AuthorCreateDto authorUpdateDto)
         {
             if (!ModelState.IsValid)
             {
@@ -80,7 +80,7 @@ namespace asp_02.Controllers
             return NoContent();
         }
 
-        // 6. DELETE: api/authors/{id} (Delete)
+        // 6. DELETE: api/authors/{id}
         [HttpDelete("{id}")]
         public IActionResult Delete(int id)
         {

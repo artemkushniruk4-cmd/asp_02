@@ -10,5 +10,7 @@ namespace asp_02.DTOs
 
         [StringLength(500)]
         public string Biography { get; set; } = string.Empty;
+        public IFormFile? ImageFile { get; set; }
+
     }
 }

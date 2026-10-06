@@ -16,5 +16,8 @@ namespace asp_02.Models
 
         // Зв'язок «один до багатьох» (в одного автора може бути багато товарів/книг)
         public ICollection<Product> Products { get; set; } = new List<Product>();
+        [StringLength(255)]
+        public string? ImagePath { get; set; }
+
     }
 }
